@@ -1,0 +1,407 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+  min-height: 100vh;
+  overflow: hidden;
+  display: block;
+  position: relative;
+}
+
+body::after {
+  content: "";
+  background: url("assets/terrain.png");
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
+  opacity: 0.8;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  position: absolute;
+  z-index: -1;
+}
+
+.zone {
+  position: absolute;
+  border-radius: 50%;
+  background-color: rgba(0, 191, 255, 0.1);
+  box-shadow:
+    0 0 20px rgba(0, 191, 255, 0.5),
+    0 0 40px rgba(0, 191, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.zone:hover {
+  transform: scale(1.2);
+  box-shadow:
+    0 0 30px rgba(0, 191, 255, 0.8),
+    0 0 60px rgba(0, 191, 255, 0.5);
+}
+
+.zone:nth-child(1) {
+  width: 300px;
+  height: 300px;
+  top: 10%;
+  left: 50%;
+}
+
+.zone:nth-child(2) {
+  width: 150px;
+  height: 150px;
+  top: 70%;
+  right: 5%;
+}
+
+.zone:nth-child(3) {
+  width: 200px;
+  height: 200px;
+  top: 40%;
+  left: 10%;
+}
+
+#game-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  z-index: 2;
+  cursor: none;
+}
+
+#myCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-color: transparent;
+}
+
+#score-board {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: white;
+  background-color: rgba(0, 0, 0, 0.7);
+  padding: 10px 15px;
+  border-radius: 5px;
+  font-size: 1.5em;
+  z-index: 3;
+}
+
+#hearts-container {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 3;
+  display: flex;
+  gap: 5px;
+}
+
+.heart {
+  width: 30px;
+  height: 30px;
+  filter: drop-shadow(0 0 5px rgba(255, 0, 0, 0.5));
+}
+
+#introduction-screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.95);
+  color: white;
+  z-index: 10;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 20px;
+}
+
+#game-over-screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.95);
+  color: white;
+  z-index: 10;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 20px;
+}
+
+.histoire-page {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 20;
+  display: flex;
+  background-color: rgba(0, 0, 0, 0.95);
+  flex-direction: column;
+}
+
+#histoire-page-1,
+#histoire-page-2 {
+  display: none;
+}
+
+.histoire-page .story {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 20px;
+}
+
+.histoire-page .story img {
+  max-width: 80%;
+  margin-bottom: 20px;
+}
+
+.click-to-start {
+  text-align: center;
+}
+
+#introduction-screen h2,
+#game-over-screen h2 {
+  color: #00bfff;
+  font-size: 2.5em;
+  margin-bottom: 40px;
+  text-shadow: 0 0 10px rgba(0, 191, 255, 0.5);
+}
+
+#game-over-screen h2 {
+  color: #ff0000;
+  text-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+}
+
+.instructions {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid #00bfff;
+  border-radius: 10px;
+  padding: 30px;
+  margin-bottom: 30px;
+  width: 90%;
+  max-width: 800px;
+}
+
+.instructions h3 {
+  color: #ffcc00;
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 1.5em;
+}
+
+.instructions ul {
+  list-style-type: none;
+  padding: 0;
+  margin-bottom: 30px;
+}
+
+.instructions li {
+  margin-bottom: 10px;
+  text-align: left;
+  padding-left: 20px;
+}
+
+#enemy-stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  color: #e0e0e0;
+}
+
+#enemy-stats-table th,
+#enemy-stats-table td {
+  padding: 10px;
+  border: 1px solid #00bfff;
+  vertical-align: middle;
+}
+
+#enemy-stats-table th {
+  background-color: rgba(0, 191, 255, 0.2);
+  color: #00bfff;
+}
+
+#enemy-stats-table td {
+  background-color: rgba(255, 255, 255, 0.05);
+  text-align: center;
+}
+
+.enemy-sprite {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+}
+
+.click-to-start {
+  font-size: 1.2em;
+  color: #ff00ff;
+  text-shadow: 0 0 5px rgba(255, 0, 255, 0.5);
+  animation: pulse 1.5s infinite alternate;
+}
+
+#final-score {
+  font-size: 1.5em;
+  color: white;
+  margin-bottom: 20px;
+}
+
+@keyframes pulse {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.7;
+  }
+}
+
+#quit-button,
+#restart-button {
+  padding: 10px 20px;
+  background-color: #ff0000;
+  color: white;
+  text-decoration: none;
+  border-radius: 5px;
+  font-weight: bold;
+  z-index: 11;
+  transition: background-color 0.3s;
+  border: none;
+  cursor: pointer;
+}
+
+#quit-button {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+}
+
+#restart-button {
+  background-color: #00bfff;
+}
+
+#quit-button:hover {
+  background-color: #cc0000;
+}
+
+#restart-button:hover {
+  background-color: #009acd;
+}
+
+@media (max-width: 768px) {
+  .instructions {
+    width: 95%;
+    padding: 20px;
+  }
+
+  #introduction-screen h2,
+  #game-over-screen h2 {
+    font-size: 2em;
+  }
+
+  .instructions h3 {
+    font-size: 1.3em;
+  }
+
+  #enemy-stats-table th,
+  #enemy-stats-table td {
+    padding: 8px;
+  }
+
+  .enemy-sprite {
+    width: 30px;
+    height: 30px;
+  }
+
+  #score-board {
+    font-size: 1.2em;
+    padding: 8px 12px;
+  }
+
+  .heart {
+    width: 25px;
+    height: 25px;
+  }
+}
+
+@media (max-width: 480px) {
+  #introduction-screen h2,
+  #game-over-screen h2 {
+    font-size: 1.5em;
+    margin-bottom: 20px;
+  }
+
+  .instructions {
+    padding: 15px;
+  }
+
+  .instructions h3 {
+    font-size: 1.1em;
+  }
+
+  .instructions li {
+    padding-left: 10px;
+    margin-bottom: 8px;
+  }
+
+  #enemy-stats-table {
+    font-size: 0.9em;
+  }
+
+  #enemy-stats-table th,
+  #enemy-stats-table td {
+    padding: 5px;
+  }
+
+  .enemy-sprite {
+    width: 25px;
+    height: 25px;
+  }
+
+  .click-to-start {
+    font-size: 1em;
+  }
+
+  #quit-button,
+  #restart-button {
+    padding: 8px 15px;
+    font-size: 0.9em;
+  }
+
+  #score-board {
+    font-size: 1em;
+    padding: 5px 10px;
+    top: 5px;
+    right: 5px;
+  }
+
+  #hearts-container {
+    top: 5px;
+    left: 5px;
+  }
+
+  .heart {
+    width: 20px;
+    height: 20px;
+  }
+
+  .story img {
+    max-width: 80%;
+  }
+}
+

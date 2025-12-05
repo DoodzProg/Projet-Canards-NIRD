@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualisation Audio 3D - Lac Synthwave (Sol Fixe)</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/tone@14.7.71/build/Tone.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* --- 1. UI DESIGN (Identique à UI.html) --- */
+        :root {
+            --bg-color: #121212;
+            --player-bg: #181818;
+            --accent-color: #1db954;
+            --text-primary: #ffffff;
+            --text-secondary: #b3b3b3;
+        }
+
+        body {
+            margin: 0; padding: 0;
+            background-color: var(--bg-color); 
+            color: var(--text-primary);
+            font-family: 'Circular', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            overflow: hidden; 
+            height: 100vh; 
+            display: flex; 
+            flex-direction: column;
+        }
+
+        /* --- BOUTONS DE NAVIGATION (Maison & Retour) --- */
+        .nav-btn {
+            position: absolute;
+            left: 25px;
+            z-index: 3000;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1.2rem;
+            text-decoration: none;
+
+            width: 50px; height: 50px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            color: #00f0ff; 
+            transform: scale(1.1);
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
+            border-color: #00f0ff;
+        }
+
+        /* Bouton Maison (Index) */
+        #home-btn { top: 25px; }
+
+        /* Bouton Retour Menu (Caché par défaut) */
+        #back-menu-btn { 
+            top: 90px; /* Juste en dessous du home-btn */
+            display: none; 
+            opacity: 0;
+            transition: opacity 0.5s ease, transform 0.3s ease;
+        }
+
+        /* Le canvas 3D en arrière-plan */
+        #visualizer-canvas {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1; pointer-events: none;
+        }
+
+        /* --- Overlay Menu --- */
+        #overlay-menu {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 2000; transition: opacity 0.8s ease;
+        }
+
+        /* --- TEXTE KONAMI (Nouveau) --- */
+        .konami-hint {
+            position: absolute;
+            bottom: 20px;
+            right: 30px;
+            color: rgba(255, 255, 255, 0.15); /* Très subtil */
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            pointer-events: none; /* Ne pas bloquer les clics */
+            user-select: none;
+        }
+
+        .stars, .stars2, .stars3 {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            animation: animStar 50s linear infinite; z-index: -1; 
+        }
+        .stars { background: transparent url('https://s3-us-west-2.amazonaws.com/s.cdpn.io/1231630/stars.png') repeat top center; }
+        .stars2 { background: transparent url('https://s3-us-west-2.amazonaws.com/s.cdpn.io/1231630/stars.png') repeat top center; animation-duration: 100s; opacity: 0.5; }
+        .stars3 { background: transparent url('https://s3-us-west-2.amazonaws.com/s.cdpn.io/1231630/stars.png') repeat top center; animation-duration: 150s; opacity: 0.3; }
+        @keyframes animStar { from { background-position: 0 0; } to { background-position: -10000px 5000px; } }
+
+        .menu-card {
+            background: rgba(40, 40, 40, 0.8); padding: 50px; border-radius: 20px; text-align: center;
+            box-shadow: 0 0 50px rgba(0, 240, 255, 0.2); max-width: 450px; width: 90%;
+            backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1);
+            transition: all 0.3s ease; /* Pour l'animation de drag */
+        }
+
+        /* Style actif lors du drag & drop */
+        .menu-card.drag-active {
+            border-color: #00f0ff;
+            box-shadow: 0 0 40px rgba(0, 240, 255, 0.4);
+            transform: scale(1.02);
+            background: rgba(40, 40, 60, 0.9);
+        }
+
+        /* Zone de texte Drop Hint */
+        .drop-hint {
+            margin-top: 15px;
+            padding: 15px;
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            color: #b3b3b3;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+            pointer-events: none; /* Important pour que l'event drop se fasse sur la card */
+        }
+
+        .menu-card.drag-active .drop-hint {
+            border-color: #00f0ff;
+            color: #ffffff;
+            background: rgba(0, 240, 255, 0.1);
+        }
+
+        h1 {
+            margin-bottom: 40px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px;
+            background: linear-gradient(to right, #00f0ff, #ff0055);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            font-size: 2.2rem; text-shadow: 0 0 20px rgba(0, 240, 255, 0.5);
+        }
+
+        .btn-large {
+            display: flex; align-items: center; justify-content: center; gap: 15px;
+            width: 100%; padding: 18px; margin: 15px 0; border: none; border-radius: 50px;
+            font-size: 1.1rem; font-weight: bold; cursor: pointer;
+            transition: all 0.3s; text-transform: uppercase; letter-spacing: 1px;
+        }
+
+        .btn-primary { background: linear-gradient(45deg, #1db954, #1ed760); color: white; box-shadow: 0 4px 15px rgba(29, 185, 84, 0.4); }
+        .btn-secondary { background: transparent; border: 2px solid rgba(255,255,255,0.2); color: var(--text-primary); }
+        .btn-large:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
+
+        #audio-file-input { display: none; }
+
+        /* --- Footer Player UI --- */
+        #audio-player {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 90px;
+            background-color: var(--player-bg); border-top: 1px solid #333;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 24px; box-sizing: border-box; 
+            z-index: 1000; transform: translateY(100%); transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
+        }
+        #audio-player.visible { transform: translateY(0); }
+
+        .player-left { width: 25%; min-width: 180px; display: flex; align-items: center; }
+        .track-art { width: 56px; height: 56px; background: #333; border-radius: 4px; display: flex; align-items: center; justify-content: center; margin-right: 15px; font-size: 24px; color: #fff; }
+        .track-info { display: flex; flex-direction: column; overflow: hidden; }
+        .track-name { font-weight: 600; font-size: 14px; color: #fff; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .track-artist { font-size: 11px; color: #b3b3b3; }
+
+        .player-center { width: 40%; max-width: 600px; display: flex; flex-direction: column; align-items: center; }
+        .player-controls { display: flex; gap: 20px; align-items: center; margin-bottom: 8px; }
+        .control-btn { background: none; border: none; color: #b3b3b3; cursor: pointer; font-size: 16px; transition: color 0.2s; }
+        .control-btn:hover { color: #fff; }
+        .btn-play-pause { width: 35px; height: 35px; border-radius: 50%; background: #fff; color: #000; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: transform 0.2s; }
+        .btn-play-pause:hover { transform: scale(1.1); }
+
+        .playback-bar { width: 100%; display: flex; align-items: center; gap: 10px; font-size: 11px; color: #b3b3b3; font-family: monospace; }
+        .progress-container { flex-grow: 1; height: 4px; background: #535353; border-radius: 2px; cursor: pointer; position: relative; padding: 6px 0; background-clip: content-box; }
+        .progress-fill { height: 4px; background-color: var(--text-primary); border-radius: 2px; width: 0%; position: relative; }
+        .progress-container:hover .progress-fill { background-color: var(--accent-color); }
+        .progress-thumb { width: 12px; height: 12px; background-color: var(--text-primary); border-radius: 50%; position: absolute; right: -6px; top: -4px; display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .progress-fill:hover > .progress-thumb { display: block !important; }
+
+        .player-right { width: 25%; min-width: 180px; display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+        .volume-container { display: flex; align-items: center; gap: 8px; width: 120px; }
+        .volume-slider { -webkit-appearance: none; width: 100%; height: 4px; border-radius: 2px; outline: none; cursor: pointer; background: #535353; }
+        .volume-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; background: #fff; border-radius: 50%; visibility: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .volume-container:hover .volume-slider::-webkit-slider-thumb { visibility: visible; }
+        .vol-percent { font-size: 11px; color: #fff; min-width: 30px; text-align: right; font-weight: bold; font-family: monospace; }
+        .vu-meter { width: 4px; height: 20px; background: #333; border-radius: 2px; overflow: hidden; display: flex; flex-direction: column-reverse; }
+        .vu-fill { width: 100%; height: 0%; background: #fff; transition: height 0.05s ease-out; }
+
+        @media (max-width: 768px) {
+            .player-left { width: 20%; } .track-artist { display: none; }
+            .player-right { width: 20%; } .volume-container { width: 80px; }
+            .vol-percent, .vu-meter { display: none; }
+        }
+
+        /* --- SNAKE GAME OVERLAY --- */
+        #snake-overlay {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 4000;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+        }
+
+        #snake-game-container {
+            position: relative;
+            border: 4px solid #00f0ff;
+            box-shadow: 0 0 20px #00f0ff, inset 0 0 20px #00f0ff;
+            background: rgba(10, 10, 20, 0.9);
+            border-radius: 10px;
+        }
+
+        canvas#snake-canvas {
+            display: block;
+            background: #000;
+        }
+
+        #snake-score {
+            font-family: 'Courier New', monospace;
+            font-size: 2rem;
+            color: #00f0ff;
+            text-shadow: 0 0 10px #00f0ff;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        #snake-message {
+            color: #ff0055;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            margin-top: 10px;
+            text-shadow: 0 0 5px #ff0055;
+            height: 20px;
+        }
+
+        /* --- NOUVEAU BOUTON REJOUER --- */
+        #snake-replay-btn {
+            display: none; /* Caché par défaut */
+            margin-top: 20px;
+            padding: 10px 25px;
+            font-family: 'Courier New', monospace;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #000;
+            background-color: #00f0ff;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 0 10px #00f0ff;
+            text-transform: uppercase;
+            transition: all 0.2s;
+        }
+
+        #snake-replay-btn:hover {
+            background-color: #fff;
+            box-shadow: 0 0 20px #00f0ff;
+            transform: scale(1.05);
+        }
+
+        .snake-title {
+            color: #ff9800;
+            font-family: 'Courier New', monospace;
+            font-size: 3rem;
+            text-shadow: 4px 4px 0px #b34a00;
+            margin-bottom: 10px;
+            font-weight: 900;
+            letter-spacing: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="visualizer-canvas"></div>
+
+    <a href="../index.html" class="nav-btn" id="home-btn" title="Retour au site NIRD">
+        <i class="fas fa-home"></i>
+    </a>
+
+    <div class="nav-btn" id="back-menu-btn" title="Retour au menu" onclick="returnToMenu()">
+        <i class="fas fa-arrow-left"></i>
+    </div>
+
+    <div id="overlay-menu">
+        <div class="stars"></div><div class="stars2"></div><div class="stars3"></div>
+
+        <div class="menu-card" id="drop-zone">
+            <h1>Visualisation Sonore 3D</h1>
+            <button class="btn-large btn-primary" id="btn-import"><i class="fas fa-music"></i> Importer MP3/WAV</button>
+            <input type="file" id="audio-file-input" accept="audio/*">
+            <button class="btn-large btn-secondary" id="btn-mic"><i class="fas fa-microphone-alt"></i> Utiliser le Micro</button>
+
+            <div class="drop-hint">
+                <i class="fas fa-cloud-upload-alt"></i> ou Glissez-Déposez votre fichier ici
+            </div>
+
+            <div id="loading-msg" style="margin-top: 20px; color: #00f0ff; font-weight: bold; display: none; text-transform: uppercase; font-size: 0.9rem;">
+                <i class="fas fa-spinner fa-spin"></i> Initialisation...
+            </div>
+        </div>
+
+        <div class="konami-hint">Konami</div>
+    </div>
+
+    <div id="snake-overlay">
+        <div class="snake-title">HIDDEN SNAKE</div>
+        <div id="snake-score">Score: 0</div>
+        <div id="snake-game-container">
+            <canvas id="snake-canvas" width="400" height="400"></canvas>
+        </div>
+        <div id="snake-message">Appuyez sur une flèche pour démarrer</div>
+
+        <button id="snake-replay-btn" onclick="startSnakeGame()">REJOUER ?</button>
+        <div style="margin-top: 20px; color: #aaa; font-family: sans-serif; font-size: 0.8rem;">(ECHAP pour quitter)</div>
+    </div>
+
+    <div id="audio-player">
+        <div class="player-left">
+            <div class="track-art"><i class="fas fa-music" id="art-icon"></i></div>
+            <div class="track-info">
+                <div class="track-name" id="ui-track-name">En attente...</div>
+                <div class="track-artist" id="ui-track-source">Fichier Local</div>
+            </div>
+        </div>
+        <div class="player-center">
+            <div class="player-controls">
+                <button class="control-btn" onclick="seekRelative(-10)"><i class="fas fa-backward"></i></button>
+                <button class="control-btn btn-play-pause" id="btn-play-pause"><i class="fas fa-play"></i></button>
+                <button class="control-btn" onclick="seekRelative(10)"><i class="fas fa-forward"></i></button>
+            </div>
+            <div class="playback-bar">
+                <span id="current-time">0:00</span>
+                <div class="progress-container" id="progress-bar-container">
+                    <div class="progress-fill" id="progress-fill">
+                        <div class="progress-thumb"></div>
+                    </div>
+                </div>
+                <span id="total-time">0:00</span>
+            </div>
+        </div>
+        <div class="player-right">
+            <div class="volume-container">
+                <i class="fas fa-volume-up" style="color: #b3b3b3;"></i>
+                <input type="range" min="0" max="100" value="70" class="volume-slider" id="volume-slider">
+            </div>
+            <span class="vol-percent" id="vol-text">70%</span>
+            <div class="vu-meter"><div class="vu-fill" id="vu-level"></div></div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const FFT_SIZE = 128; 
+        const GRID_SIZE = 2400; 
+        const GRID_SEGMENTS = 90; 
+
+        // --- VARIABLES GLOBALES ---
+        let player = null, analyser = null, mic = null, volumeNode = null, meterNode = null;
+        let isPlaying = false, isMicMode = false, duration = 0, startTime = 0, pausedAt = 0, timeInterval = null, isDragging = false;
+
+        let scene, camera, renderer, gridMesh, sunMesh;
+        let clock = new THREE.Clock(); 
+        let volumeIntensity = 0.7;
+
+        // UI Refs
+        const ui = {
+            menu: document.getElementById('overlay-menu'), player: document.getElementById('audio-player'),
+            btnImport: document.getElementById('btn-import'), btnMic: document.getElementById('btn-mic'),
+            fileInput: document.getElementById('audio-file-input'), loadingMsg: document.getElementById('loading-msg'),
+            playPauseBtn: document.getElementById('btn-play-pause'), playPauseIcon: document.querySelector('#btn-play-pause i'),
+            trackName: document.getElementById('ui-track-name'), trackSource: document.getElementById('ui-track-source'), artIcon: document.getElementById('art-icon'),
+            currTime: document.getElementById('current-time'), totTime: document.getElementById('total-time'),
+            progContainer: document.getElementById('progress-bar-container'), progFill: document.getElementById('progress-fill'),
+            volSlider: document.getElementById('volume-slider'), volText: document.getElementById('vol-text'), vuLevel: document.getElementById('vu-level'),
+            backMenuBtn: document.getElementById('back-menu-btn')
+        };
+
+        // --- 1. MOTEUR 3D ---
+        function initThreeJS() {
+            const container = document.getElementById('visualizer-canvas');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050011); 
+            scene.fog = new THREE.FogExp2(0x050011, 0.001); 
+
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 4000);
+            camera.position.set(0, 60, 500); 
+            camera.lookAt(0, 20, -500);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.innerHTML = '';
+            container.appendChild(renderer.domElement);
+
+            // Soleil
+            const sunGeo = new THREE.CircleGeometry(250, 64);
+            const sunMat = new THREE.MeshBasicMaterial({ color: 0xff0055, fog: false });
+            sunMesh = new THREE.Mesh(sunGeo, sunMat);
+            sunMesh.position.set(0, 100, -1200); 
+            scene.add(sunMesh);
+
+            // Grille (Vagues)
+            const gridGeo = new THREE.PlaneGeometry(GRID_SIZE, GRID_SIZE, GRID_SEGMENTS, GRID_SEGMENTS);
+            gridGeo.rotateX(-Math.PI / 2);
+
+            const gridMat = new THREE.MeshBasicMaterial({ 
+                color: 0x00f0ff, 
+                wireframe: true, transparent: true, opacity: 0.6
+            });
+
+            gridMesh = new THREE.Mesh(gridGeo, gridMat);
+            scene.add(gridMesh);
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const elapsedTime = clock.getElapsedTime();
+
+            let dataArray = null;
+            if (analyser && (isPlaying || isMicMode)) {
+                try { dataArray = analyser.getValue(); } catch(e) {}
+            }
+
+            if (gridMesh && dataArray) {
+                const positions = gridMesh.geometry.attributes.position;
+                const count = positions.count;
+
+                let bassSum = 0;
+                for(let k = 0; k < 10; k++) {
+                    let val = (dataArray[k] + 100) / 100;
+                    bassSum += Math.max(0, val);
+                }
+                const bassLevel = (bassSum / 10) * volumeIntensity; 
+
+                // Mouvement temporel
+                const time = elapsedTime * 0.8; 
+                const waveAmp = 75 * volumeIntensity;
+
+                for (let i = 0; i < count; i++) {
+                    const x = positions.getX(i);
+                    const z = positions.getZ(i);
+
+                    let depthFactor = Math.max(0, (600 - z) / 800); 
+                    depthFactor = Math.pow(depthFactor, 2.5);
+
+                    const freqIndex = i % Math.min(dataArray.length, 64);
+                    let audioVal = (dataArray[freqIndex] + 100) / 100;
+                    if (audioVal < 0) audioVal = 0;
+
+                    let zWave = Math.sin(x * 0.5 + time) * Math.cos(z * 0.3 + time * 0.5);
+                    let totalHeight = (zWave * 2 + audioVal * waveAmp) * depthFactor;
+
+                    positions.setY(i, totalHeight);
+                }
+                positions.needsUpdate = true;
+
+                // Soleil (Pulse)
+                const scale = 1 + (bassLevel * 0.3);
+                sunMesh.scale.set(scale, scale, 1);
+                sunMesh.material.color.setHSL(0.95 + (bassLevel * 0.15), 1, 0.5);
+            }
+
+            if (renderer && scene && camera) {
+                renderer.render(scene, camera);
+            }
+        }
+
+        // --- 2. LOGIQUE AUDIO & UI ---
+        async function startEngine() {
+            if (Tone.context.state !== 'running') await Tone.start();
+            if (!volumeNode) {
+                volumeNode = new Tone.Volume(-10).toDestination();
+                analyser = new Tone.Analyser('fft', FFT_SIZE);
+                meterNode = new Tone.Meter();
+            }
+        }
+
+        function showBackToMenuButton() {
+            ui.backMenuBtn.style.display = 'flex';
+            setTimeout(() => ui.backMenuBtn.style.opacity = '1', 10);
+        }
+
+        function hideBackToMenuButton() {
+            ui.backMenuBtn.style.opacity = '0';
+            setTimeout(() => ui.backMenuBtn.style.display = 'none', 300);
+        }
+
+        function returnToMenu() {
+            stopAudio();
+            // Cacher le player audio UI
+            ui.player.classList.remove('visible');
+            // Réafficher le menu
+            ui.menu.style.display = 'flex';
+            setTimeout(() => ui.menu.style.opacity = '1', 10);
+            // Cacher le bouton retour
+            hideBackToMenuButton();
+        }
+
+        function loadFile(file) {
+            ui.loadingMsg.style.display = 'block'; ui.btnImport.disabled = true;
+            startEngine().then(() => {
+                stopAudio();
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const buffer = await Tone.context.decodeAudioData(e.target.result);
+                        player = new Tone.Player(buffer);
+                        player.connect(analyser); analyser.connect(meterNode); meterNode.connect(volumeNode);
+                        player.loop = false; duration = buffer.duration;
+                        ui.totTime.textContent = formatTime(duration); ui.trackName.textContent = file.name.replace(/\.[^/.]+$/, "");
+                        ui.trackSource.textContent = "Fichier Local"; ui.artIcon.className = "fas fa-music";
+                        ui.menu.style.opacity = '0'; setTimeout(() => ui.menu.style.display = 'none', 800);
+                        ui.player.classList.add('visible'); ui.loadingMsg.style.display = 'none'; ui.btnImport.disabled = false;
+
+                        showBackToMenuButton(); // Afficher le bouton retour
+                        playAudio();
+                    } catch (err) { alert("Erreur: " + err); ui.loadingMsg.style.display = 'none'; ui.btnImport.disabled = false; }
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function loadMic() {
+            ui.loadingMsg.style.display = 'block';
+            startEngine().then(() => {
+                stopAudio(); isMicMode = true;
+                mic = new Tone.UserMedia();
+                mic.connect(analyser); analyser.connect(meterNode);
+                mic.open().then(() => {
+                    ui.menu.style.opacity = '0'; setTimeout(() => ui.menu.style.display = 'none', 800);
+                    ui.player.classList.add('visible');
+                    ui.trackName.textContent = "Microphone"; ui.trackSource.textContent = "Entrée Directe"; ui.artIcon.className = "fas fa-microphone";
+                    ui.playPauseBtn.disabled = true; ui.progContainer.style.pointerEvents = 'none'; ui.loadingMsg.style.display = 'none'; isPlaying = true;
+
+                    showBackToMenuButton(); // Afficher le bouton retour
+                }).catch(e => { alert("Erreur: " + e); ui.loadingMsg.style.display = 'none'; });
+            });
+        }
+
+        function playAudio(offset = 0) {
+            if (!player) return;
+            const startPoint = offset > 0 ? offset : pausedAt;
+            player.start(Tone.now(), startPoint);
+            startTime = Tone.now() - startPoint;
+            isPlaying = true; updatePlayButtonUI(); startProgressLoop();
+        }
+
+        function pauseAudio() {
+            if (!player) return;
+            player.stop(); pausedAt = Tone.now() - startTime;
+            isPlaying = false; updatePlayButtonUI(); stopProgressLoop();
+        }
+
+        function togglePlayPause() { if (!isMicMode) isPlaying ? pauseAudio() : playAudio(); }
+
+        function stopAudio() {
+            if (player) { player.dispose(); player = null; }
+            if (mic) { mic.close(); mic = null; }
+            isPlaying = false; isMicMode = false; pausedAt = 0; startTime = 0;
+            stopProgressLoop(); updatePlayButtonUI();
+        }
+
+        function seekRelative(sec) {
+            if (!player || isMicMode) return;
+            let current = isPlaying ? Tone.now() - startTime : pausedAt;
+            let target = Math.max(0, Math.min(duration, current + sec));
+            pausedAt = target; startTime = Tone.now() - target;
+            if (isPlaying) { player.stop(); player.start(Tone.now(), target); } else { updateProgressBarUI(target); }
+        }
+
+        function seekToPercent(pct) {
+            if (!player || isMicMode) return;
+            const target = duration * pct;
+            pausedAt = target; startTime = Tone.now() - target;
+            if (isPlaying) { player.stop(); player.start(Tone.now(), target); } else { updateProgressBarUI(target); }
+        }
+
+        function updateVolumeSlider(val) {
+            ui.volText.textContent = `${val}%`;
+            const db = val > 0 ? 20 * Math.log10(val / 100) : -Infinity;
+            if (volumeNode) volumeNode.volume.value = db;
+            volumeIntensity = val / 100;
+            ui.volSlider.style.background = `linear-gradient(to right, #fff 0%, #fff ${val}%, #535353 ${val}%, #535353 100%)`;
+        }
+
+        function startProgressLoop() {
+            if (timeInterval) clearInterval(timeInterval);
+            timeInterval = setInterval(() => {
+                if (meterNode) {
+                    const db = meterNode.getValue();
+                    let level = Math.max(0, (db + 60) / 60) * 100;
+                    ui.vuLevel.style.height = `${Math.min(100, level)}%`;
+                }
+                if (!isPlaying || isMicMode || isDragging) return;
+                const elapsed = Tone.now() - startTime;
+                if (elapsed >= duration) { pauseAudio(); pausedAt = 0; updateProgressBarUI(0); } else { updateProgressBarUI(elapsed); }
+            }, 50);
+        }
+
+        function stopProgressLoop() { if (timeInterval) clearInterval(timeInterval); }
+        function updateProgressBarUI(seconds) {
+            const pct = Math.min(100, (seconds / duration) * 100);
+            ui.progFill.style.width = `${pct}%`;
+            ui.currTime.textContent = formatTime(seconds);
+        }
+        function updatePlayButtonUI() { ui.playPauseIcon.className = isPlaying ? "fas fa-pause" : "fas fa-play"; }
+        function formatTime(sec) { const m = Math.floor(sec / 60), s = Math.floor(sec % 60); return `${m}:${s < 10 ? '0' : ''}${s}`; }
+
+        ui.btnImport.onclick = () => ui.fileInput.click();
+        ui.fileInput.onchange = (e) => { if (e.target.files[0]) loadFile(e.target.files[0]); };
+        ui.btnMic.onclick = loadMic;
+        ui.playPauseBtn.onclick = togglePlayPause;
+        ui.volSlider.addEventListener('input', (e) => updateVolumeSlider(e.target.value));
+
+        const getProgressFromEvent = (e) => {
+            const rect = ui.progContainer.getBoundingClientRect();
+            let x = e.clientX - rect.left; x = Math.max(0, Math.min(x, rect.width));
+            return x / rect.width;
+        };
+        ui.progContainer.addEventListener('mousedown', (e) => { if (!player || isMicMode) return; isDragging = true; const pct = getProgressFromEvent(e); updateProgressBarUI(duration * pct); });
+        window.addEventListener('mousemove', (e) => { if (isDragging) { const pct = getProgressFromEvent(e); updateProgressBarUI(duration * pct); } });
+        window.addEventListener('mouseup', (e) => { if (isDragging) { isDragging = false; seekToPercent(getProgressFromEvent(e)); } });
+
+        updateVolumeSlider(70);
+        window.onload = initThreeJS;
+
+        // --- GESTION GLOBALE TOUCHE ECHAP (Snake ou Retour Menu) ---
+        document.addEventListener('keydown', (e) => {
+            if (e.key === "Escape") {
+                if (document.getElementById('snake-overlay').style.display === 'flex') {
+                    stopSnakeGame();
+                } else if (ui.menu.style.display === 'none') {
+                    returnToMenu();
+                }
+            }
+        });
+
+        // --- DRAG & DROP LOGIC ---
+        const dropZone = document.getElementById('drop-zone');
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.add('drag-active');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.remove('drag-active');
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.type.startsWith('audio/')) {
+                    loadFile(file);
+                } else {
+                    alert("Merci de déposer un fichier audio (MP3, WAV...)");
+                }
+            }
+        }, false);
+
+        // --- EASTER EGG : KONAMI CODE SNAKE ---
+        const konamiCode = [
+            "ArrowUp", "ArrowUp", 
+            "ArrowDown", "ArrowDown", 
+            "ArrowLeft", "ArrowRight", 
+            "ArrowLeft", "ArrowRight", 
+            "b", "a", "Enter"
+        ];
+        let konamiIndex = 0;
+
+        document.addEventListener('keydown', (e) => {
+            const key = e.key;
+            const expected = konamiCode[konamiIndex];
+
+            let match = false;
+            if (expected.length === 1) { 
+                if (key.toLowerCase() === expected.toLowerCase()) match = true;
+            } else { 
+                if (key === expected) match = true;
+            }
+
+            if (match) {
+                konamiIndex++;
+                if (konamiIndex === konamiCode.length) {
+                    startSnakeGame();
+                    konamiIndex = 0;
+                }
+            } else {
+                konamiIndex = 0;
+            }
+        });
+
+        // --- SNAKE GAME LOGIC ---
+        const snakeCanvas = document.getElementById('snake-canvas');
+        const ctx = snakeCanvas.getContext('2d');
+        const snakeOverlay = document.getElementById('snake-overlay');
+        const scoreEl = document.getElementById('snake-score');
+        const msgEl = document.getElementById('snake-message');
+        const replayBtn = document.getElementById('snake-replay-btn'); 
+
+        const box = 20; 
+        const canvasSize = 400;
+        let snake = [];
+        let food = {};
+        let d;
+        let gameInterval;
+        let snakeScore = 0;
+        let gameRunning = false;
+
+        // CORRECTION "RAPID INPUT" : FILE D'ATTENTE DE DIRECTIONS
+        let directionQueue = [];
+
+        function startSnakeGame() {
+            snakeOverlay.style.display = 'flex';
+            replayBtn.style.display = 'none';
+            if(isPlaying) pauseAudio();
+
+            snake = [];
+            snake[0] = { x: 9 * box, y: 10 * box };
+            snakeScore = 0;
+            scoreEl.innerText = "Score: 0";
+            msgEl.innerText = "Utilisez les flèches pour jouer";
+            d = undefined; 
+            directionQueue = []; // Reset queue
+
+            spawnFood();
+
+            if(gameInterval) clearInterval(gameInterval);
+            gameInterval = setInterval(drawSnake, 100);
+            gameRunning = true;
+
+            window.addEventListener('keydown', direction);
+        }
+
+        function stopSnakeGame() {
+            snakeOverlay.style.display = 'none';
+            replayBtn.style.display = 'none';
+            clearInterval(gameInterval);
+            gameRunning = false;
+            window.removeEventListener('keydown', direction);
+        }
+
+        function direction(event) {
+            if(!gameRunning) return;
+
+            // Empêche le scroll
+            if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(event.key)) {
+                event.preventDefault();
+            }
+
+            // Déterminer la nouvelle direction souhaitée
+            let newDir;
+            if (event.keyCode == 37) newDir = "LEFT";
+            else if (event.keyCode == 38) newDir = "UP";
+            else if (event.keyCode == 39) newDir = "RIGHT";
+            else if (event.keyCode == 40) newDir = "DOWN";
+            else return;
+
+            // Déterminer la dernière direction prévue (pour validation)
+            // Si la queue est vide, on compare avec la direction actuelle 'd'
+            // Si la queue n'est pas vide, on compare avec la dernière entrée de la queue
+            let lastScheduledDir = directionQueue.length > 0 ? directionQueue[directionQueue.length - 1] : d;
+
+            // Vérification anti-retournement (ex: Pas de DROITE si on va à GAUCHE)
+            if (newDir == "LEFT" && lastScheduledDir != "RIGHT" && lastScheduledDir != "LEFT") directionQueue.push("LEFT");
+            else if (newDir == "UP" && lastScheduledDir != "DOWN" && lastScheduledDir != "UP") directionQueue.push("UP");
+            else if (newDir == "RIGHT" && lastScheduledDir != "LEFT" && lastScheduledDir != "RIGHT") directionQueue.push("RIGHT");
+            else if (newDir == "DOWN" && lastScheduledDir != "UP" && lastScheduledDir != "DOWN") directionQueue.push("DOWN");
+        }
+
+        function spawnFood() {
+            food = {
+                x: Math.floor(Math.random() * (canvasSize/box)) * box,
+                y: Math.floor(Math.random() * (canvasSize/box)) * box
+            };
+            for(let part of snake) {
+                if(part.x === food.x && part.y === food.y) spawnFood();
+            }
+        }
+
+        function collision(head, array) {
+            for (let i = 0; i < array.length; i++) {
+                if (head.x == array[i].x && head.y == array[i].y) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function drawSnake() {
+            ctx.fillStyle = "#000";
+            ctx.fillRect(0, 0, canvasSize, canvasSize);
+
+            for (let i = 0; i < snake.length; i++) {
+                ctx.fillStyle = (i == 0) ? "#00f0ff" : "#ffffff"; 
+                ctx.fillRect(snake[i].x, snake[i].y, box, box);
+                ctx.strokeStyle = "#000";
+                ctx.strokeRect(snake[i].x, snake[i].y, box, box);
+            }
+
+            ctx.fillStyle = "#ff0055"; 
+            ctx.fillRect(food.x, food.y, box, box);
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = "#ff0055";
+            ctx.fillRect(food.x, food.y, box, box);
+            ctx.shadowBlur = 0; 
+
+            // --- CONSOMMATION DE LA FILE D'ATTENTE ---
+            // Si des inputs sont en attente, on prend le premier
+            if (directionQueue.length > 0) {
+                d = directionQueue.shift();
+            }
+
+            // SI AUCUNE DIRECTION DÉFINIE (Début de partie), ON S'ARRÊTE ICI
+            if (!d) return;
+
+            let snakeX = snake[0].x;
+            let snakeY = snake[0].y;
+
+            if (d == "LEFT") snakeX -= box;
+            if (d == "UP") snakeY -= box;
+            if (d == "RIGHT") snakeX += box;
+            if (d == "DOWN") snakeY += box;
+
+            // Wrapping
+            if (snakeX < 0) snakeX = canvasSize - box;
+            if (snakeX >= canvasSize) snakeX = 0;
+            if (snakeY < 0) snakeY = canvasSize - box;
+            if (snakeY >= canvasSize) snakeY = 0;
+
+            if (snakeX == food.x && snakeY == food.y) {
+                snakeScore++;
+                scoreEl.innerText = "Score: " + snakeScore;
+                spawnFood();
+            } else {
+                snake.pop();
+            }
+
+            let newHead = { x: snakeX, y: snakeY };
+
+            if (collision(newHead, snake)) {
+                clearInterval(gameInterval);
+                msgEl.innerText = "GAME OVER !";
+                replayBtn.style.display = 'block'; 
+                gameRunning = false;
+                return;
+            }
+
+            snake.unshift(newHead);
+        }
+
+    </script>
+</body>
+</html>
+

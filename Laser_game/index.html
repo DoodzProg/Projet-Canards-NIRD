@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Laser game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="background-effects">
+    <div class="zone"></div>
+    <div class="zone"></div>
+    <div class="zone"></div>
+  </div>
+  <a href="../" id="quit-button">Quitter</a>
+  
+  <div id="game-container">
+    <canvas id="myCanvas"></canvas>
+    <div id="score-board">Score: <span id="score-value">0</span></div>
+    <div id="hearts-container">
+      <img src="assets/coeur_plein.png" class="heart"><img src="assets/coeur_plein.png" class="heart"><img src="assets/coeur_plein.png" class="heart">
+    </div>
+  </div>
+
+  <div id="histoire-page-1" class="histoire-page">
+      <div class="story">
+        <img src="assets/histoire.png" alt="histoire">
+        <img src="assets/evil.png" alt="evil">
+        <p class="click-to-start">Cliquez n'importe où pour continuer !</p>
+      </div>
+  </div>
+
+  <div id="histoire-page-2" class="histoire-page">
+    <div class="story">
+        <img src="assets/histoire2.png" alt="histoire2">
+        <img src="assets/linux.png" alt="linux">
+        <p class="click-to-start">Cliquez n'importe où pour continuer !</p>
+    </div>
+  </div>
+  
+  <div id="introduction-screen">
+      <h2>🎯 LASERGAME-EVOLUTION ! La vengance de Linux 🎯</h2>
+      
+      <div class="instructions">
+          <h3>Règles du Jeu</h3>
+          <ul>
+              <li>Vous devez <b>cliquer</b> sur les ennemis avant qu'ils ne deviennent trop <b>dangereux</b> (signalés par le panneau  ).</li>
+              <li>S'ils atteignent leur état dangereux et s'échappent, vous <b>perdez des cœurs</b> (1 ou 2 selon l'ennemi).</li>
+              <li>Votre objectif est de survivre le plus longtemps possible et de faire le meilleur score.</li>
+              <li>Certains ennemis ont besoin de <b>plusieurs coups</b> pour être détruits.</li>
+          </ul>
+
+          <h3>Spécificités des Ennemis</h3>
+          <table id="enemy-stats-table">
+              <tr>
+                  <th>Ennemi</th>
+                  <th>Vitesse</th>
+                  <th>Dégâts (Cœurs)</th>
+                  <th>Résistance (Coups)</th>
+                  <th>Délai d'Attaque</th>
+                  <th>Sprite</th> </tr>
+              <tr>
+                  <td><b>Apple</b></td>
+                  <td>Normale</td>
+                  <td>1</td>
+                  <td>1</td>
+                  <td>Normal</td>
+                  <td><img src="assets/apple_sprite.png" alt="Sprite Apple" class="enemy-sprite"></td> </tr>
+              <tr>
+                  <td><b>Windows</b></td>
+                  <td>Normale</td>
+                  <td>1</td>
+                  <td><b>2</b></td>
+                  <td>Légèrement Long</td>
+                  <td><img src="assets/Windows_sprite.png" alt="Sprite Windows" class="enemy-sprite"></td> </tr>
+              <tr>
+                  <td><b>Riot</b></td>
+                  <td><b>Très Rapide</b></td>
+                  <td>1</td>
+                  <td>1</td>
+                  <td>Légèrement Long</td>
+                  <td><img src="assets/Riot_sprite.png" alt="Sprite Riot" class="enemy-sprite"></td> </tr>
+              <tr>
+                  <td><b>Bezos</b></td>
+                  <td><b>Immobile</b></td>
+                  <td><b>2</b></td>
+                  <td>1</td>
+                  <td><b>Très Long</b></td>
+                  <td><img src="assets/Bezos_sprite.png" alt="Sprite Bezos" class="enemy-sprite"></td> </tr>
+          </table>
+      </div>
+
+      <p class="click-to-start">Cliquez n'importe où pour commencer la partie !</p>
+  </div>
+
+  <div id="game-over-screen">
+    <h2 class="neonText">Game Over!</h2>
+    <p id="final-score"></p>
+    <button id="restart-button">Redémarrer</button>
+  </div>
+
+  <script src="code.js"></script>
+</body>
+</html>
